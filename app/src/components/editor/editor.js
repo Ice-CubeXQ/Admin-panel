@@ -1,9 +1,12 @@
+import "../../helpers/iframeLoader.js";
 import React, { Component } from "react";
 import axios from "axios";
 
 export default class Editor extends Component {
   constructor() {
     super();
+
+    this.currentPage = "index.html";
 
     this.state = {
       pageList: [],
@@ -13,7 +16,40 @@ export default class Editor extends Component {
   }
 
   componentDidMount() {
+    this.init(this.currentPage);
+  }
+
+  init(page) {
+    this.iframe = document.querySelector("iframe");
+    this.open(page);
     this.loadPageList();
+  }
+
+  open(page) {
+    this.currentPage = `../${page}`;
+    this.iframe.load(this.currentPage, () => {
+      const body = this.iframe.contentDocument.body;
+      let textNodes = [];
+
+      function recursy(element) {
+        element.childNodes.forEach((node) => {
+          if (node.nodeName === "#text" && node.nodeValue.replace(/\s+/g, "").length > 0) {
+            textNodes.push(node);
+          } else {
+            recursy(node);
+          }
+        });
+      }
+
+      recursy(body);
+
+      textNodes.forEach((node) => {
+        const wrapper = this.iframe.contentDocument.createElement("text-editor");
+        node.parentNode.replaceChild(wrapper, node);
+        wrapper.appendChild(node);
+        wrapper.contentEditable = "true";
+      });
+    });
   }
 
   loadPageList() {
@@ -47,7 +83,7 @@ export default class Editor extends Component {
     //   );
     // });
     return (
-      <iframe src="../index.html" frameBorder={0}></iframe>
+      <iframe src={this.currentPage}></iframe>
       // <>
       //   <input
       //     onChange={(e) => {
