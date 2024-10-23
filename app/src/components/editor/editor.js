@@ -26,10 +26,10 @@ export default class Editor extends Component {
   }
 
   open(page) {
-    this.currentPage = `../${page}?rnd=${Math.random()}`;
+    this.currentPage = page;
 
     axios
-      .get(`../${page}`)
+      .get(`../${page}?rnd=${Math.random()}`)
       .then((res) => this.parseStrtoDOM(res.data))
       .then(this.wrapTextNodes)
       .then((dom) => {
@@ -40,6 +40,12 @@ export default class Editor extends Component {
       .then((html) => axios.post("./api/saveTempPage.php", { html }))
       .then(() => this.iframe.load("../temp.html"))
       .then(() => this.enableEditing());
+  }
+  save() {
+    const newDom = this.virtualDom.cloneNode(this.virtualDom);
+    this.unwrapTextNodes(newDom);
+    const html = this.serializeDOMToString(newDom);
+    axios.post("./api/savePage.php", { pageName: this.currentPage, html });
   }
 
   enableEditing() {
@@ -85,6 +91,11 @@ export default class Editor extends Component {
 
     return dom;
   }
+  unwrapTextNodes(dom) {
+    dom.body.querySelectorAll("text-editor").forEach((element) => {
+      element.parentNode.replaceChild(element.firstChild, element);
+    });
+  }
 
   serializeDOMToString(dom) {
     const serializer = new XMLSerializer();
@@ -122,7 +133,11 @@ export default class Editor extends Component {
     //   );
     // });
     return (
-      <iframe src={this.currentPage}></iframe>
+      <>
+        <button onClick={() => this.save()}>click</button>
+        <iframe src={this.currentPage}></iframe>
+      </>
+
       // <>
       //   <input
       //     onChange={(e) => {
