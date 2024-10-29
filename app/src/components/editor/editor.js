@@ -7,6 +7,7 @@ import UIkit from "uikit";
 import Spinner from "../spinner/spinner.js";
 import ConfirmModal from "../confirm-modal/confirm-modal.js";
 import ChooseModal from "../choose-modal/choose-modal.js";
+import Panel from "../panel/panel.js";
 
 export default class Editor extends Component {
   constructor() {
@@ -16,14 +17,16 @@ export default class Editor extends Component {
 
     this.state = {
       pageList: [],
+      backupsList: [],
       newPageName: "",
       loading: true,
     };
-    this.createNewPage = this.createNewPage.bind(this);
+
     this.isLoading = this.isLoading.bind(this);
     this.isLoaded = this.isLoaded.bind(this);
     this.save = this.save.bind(this);
     this.init = this.init.bind(this);
+    this.restoreBackup = this.restoreBackup.bind(this);
   }
 
   componentDidMount() {
@@ -38,6 +41,7 @@ export default class Editor extends Component {
     this.iframe = document.querySelector("iframe");
     this.open(page, this.isLoaded);
     this.loadPageList();
+    this.loadBackupsList();
   }
 
   open(page, cb) {
@@ -58,13 +62,17 @@ export default class Editor extends Component {
       .then(() => this.enableEditing())
       .then(() => this.injectStyles())
       .then(cb);
+
+    this.loadBackupsList();
   }
-  save(onSuccess, onError) {
+  async save(onSuccess, onError) {
     this.isLoading();
     const newDom = this.virtualDom.cloneNode(this.virtualDom);
     DOMHelper.unwrapTextNodes(newDom);
     const html = DOMHelper.serializeDOMToString(newDom);
-    axios.post("./api/savePage.php", { pageName: this.currentPage, html }).then(onSuccess).catch(onError).finally(this.isLoaded);
+    await axios.post("./api/savePage.php", { pageName: this.currentPage, html }).then(onSuccess).catch(onError).finally(this.isLoaded);
+
+    this.loadBackupsList();
   }
 
   enableEditing() {
@@ -95,18 +103,29 @@ export default class Editor extends Component {
     axios.get("./api/pageList.php").then((res) => this.setState({ pageList: res.data }));
   }
 
-  createNewPage() {
-    axios
-      .post("./api/createNewPage.php", { name: this.state.newPageName })
-      .then(this.loadPageList())
-      .catch(() => alert("Страница уже существует"));
+  loadBackupsList() {
+    axios.get("./backups/backups.json").then((res) =>
+      this.setState({
+        backupsList: res.data.filter((backup) => {
+          return backup.page === this.currentPage;
+        }),
+      })
+    );
   }
 
-  deletePage(page) {
-    axios
-      .post("./api/deletePage.php", { name: page })
-      .then(this.loadPageList())
-      .catch(() => alert("Страницы не существует"));
+  restoreBackup(e, backup) {
+    if (e) {
+      e.preventDefault();
+    }
+    UIkit.modal
+      .confirm("Вы действительно хотите восстановить эту страницу из этой резервной копии? Все несохраненные данные будут потеряны!", { labels: { ok: "Восстановить", cancel: "Отмена" } })
+      .then(() => {
+        this.isLoading();
+        return axios.post("./api/restoreBackup.php", { page: this.currentPage, file: backup });
+      })
+      .then(() => {
+        this.open(this.currentPage, this.isLoaded);
+      });
   }
 
   isLoading() {
@@ -117,7 +136,7 @@ export default class Editor extends Component {
   }
 
   render() {
-    const { loading, pageList } = this.state;
+    const { loading, pageList, backupsList } = this.state;
     const modal = true;
 
     let spinner;
@@ -125,21 +144,15 @@ export default class Editor extends Component {
 
     return (
       <>
-        <iframe src={this.currentPage}></iframe>
+        <iframe src=""></iframe>
 
         {spinner}
 
-        <div className="panel">
-          <button uk-toggle="target: #modal-open" className="uk-button uk-button-primary uk-margin-small-right">
-            Открыть
-          </button>
-          <button uk-toggle="target: #modal-save" className="uk-button uk-button-primary">
-            Опубликовать
-          </button>
-        </div>
+        <Panel />
 
         <ConfirmModal modal={modal} target={"modal-save"} method={this.save} />
         <ChooseModal modal={modal} target={"modal-open"} data={pageList} redirect={this.init} />
+        <ChooseModal modal={modal} target={"modal-backup"} data={backupsList} redirect={this.restoreBackup} />
       </>
     );
   }
