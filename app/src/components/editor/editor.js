@@ -9,6 +9,7 @@ import ConfirmModal from "../confirm-modal/confirm-modal.js";
 import ChooseModal from "../choose-modal/choose-modal.js";
 import Panel from "../panel/panel.js";
 import EditorMeta from "../editor-meta/editor-meta.js";
+import EditorImages from "../editor-images/editor-images.js";
 
 export default class Editor extends Component {
   constructor() {
@@ -52,6 +53,7 @@ export default class Editor extends Component {
       .get(`../${page}?rnd=${Math.random()}`)
       .then((res) => DOMHelper.parseStrtoDOM(res.data))
       .then(DOMHelper.wrapTextNodes)
+      .then(DOMHelper.wrapImages)
       .then((dom) => {
         this.virtualDom = dom;
         return dom;
@@ -70,6 +72,7 @@ export default class Editor extends Component {
     this.isLoading();
     const newDom = this.virtualDom.cloneNode(this.virtualDom);
     DOMHelper.unwrapTextNodes(newDom);
+    DOMHelper.unwrapImages(newDom);
     const html = DOMHelper.serializeDOMToString(newDom);
     await axios.post("./api/savePage.php", { pageName: this.currentPage, html }).then(onSuccess).catch(onError).finally(this.isLoaded);
 
@@ -83,19 +86,30 @@ export default class Editor extends Component {
 
       new EditorText(element, virtualElement);
     });
+
+    this.iframe.contentDocument.body.querySelectorAll("[editableimgid]").forEach((element) => {
+      const id = element.getAttribute("editableimgid");
+      const virtualElement = this.virtualDom.body.querySelector(`[editableimgid="${id}"]`);
+
+      new EditorImages(element, virtualElement);
+    });
   }
 
   injectStyles() {
     const style = this.iframe.contentDocument.createElement("style");
     style.innerHTML = `
-    text-editor:hover{
+    text-editor:hover {
       outline: 3px solid orange;
       outline-offset: 8px;
     }
-      text-editor:focus{
-      outline: 3px solid red;
-      outline-offset: 8px;
+      text-editor:focus {
+        outline: 3px solid red;
+        outline-offset: 8px;
     }
+      [editableimgid]:hover {
+        outline: 3px solid orange;
+        outline-offset: 8px;
+      }
     `;
     this.iframe.contentDocument.head.appendChild(style);
   }
@@ -146,6 +160,7 @@ export default class Editor extends Component {
     return (
       <>
         <iframe src=""></iframe>
+        <input id="img-upload" type="file" accept="image/*" style={{ display: "none" }}></input>
 
         {spinner}
 

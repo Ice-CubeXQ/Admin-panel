@@ -2,6 +2,7 @@ const gulp = require("gulp");
 const { debug } = require("webpack");
 const webpack = require("webpack-stream");
 const sass = require("gulp-sass")(require("sass"));
+const ghPages = require("gulp-gh-pages-will");
 
 const dist = "D:/Software/OpenServer/OSPanel/home/react-admin.local/admin";
 
@@ -70,5 +71,14 @@ gulp.task("watch", () => {
 });
 
 gulp.task("build", gulp.parallel("copy-html", "copy-assets", "copy-api", "build-sass", "build-js"));
+
+gulp.task("deploy", () => {
+  return gulp.src(`D:/Software/OpenServer/OSPanel/home/react-admin.local/**/*`).pipe(
+    ghPages({
+      remoteUrl: "https://github.com/Ice-CubeXQ/Admin-panel",
+      branch: "gh-pages",
+    })
+  );
+});
 
 gulp.task("default", gulp.parallel("watch", "build"));
